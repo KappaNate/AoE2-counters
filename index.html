@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>body{margin:0}[hidden]{display:none!important}</style>
+<title>AoE2 Counter Lookup</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya+SC:wght@500;700&family=Alegreya+Sans:wght@400;500;700&display=swap">
+<style>
+/* Layout: sticky search bar on top, a single column of unit cards beneath; each card answers "what beats this?" first. */
+:root {
+  --bg: #eceee9;
+  --panel: #fbfbf8;
+  --fg: #1d2320;
+  --muted: #5c6660;
+  --line: #d3d8d1;
+  --accent: #2b4a8b;
+  --beat: #1f6b45;
+  --beat-bg: #e1efe6;
+  --avoid: #8a2a2a;
+  --avoid-bg: #f4e3e1;
+  --chip: #e6e9e3;
+  --melee: #8a5a12; --melee-bg: #f3e6cc;
+  --pierce: #235a8c; --pierce-bg: #dde8f3;
+  --display: "Alegreya SC", "Palatino Linotype", Georgia, serif;
+  --body: "Alegreya Sans", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141917; --panel: #1c2320; --fg: #e6ebe7; --muted: #9aa59f; --line: #2d3631;
+    --accent: #8fb0f0; --beat: #7ed3a2; --beat-bg: #1b3328; --avoid: #f0a39b; --avoid-bg: #3a2220; --chip: #26302b;
+    --melee: #f0c27a; --melee-bg: #3a2e1a; --pierce: #9cc6f0; --pierce-bg: #1c2c3c;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141917; --panel: #1c2320; --fg: #e6ebe7; --muted: #9aa59f; --line: #2d3631;
+  --accent: #8fb0f0; --beat: #7ed3a2; --beat-bg: #1b3328; --avoid: #f0a39b; --avoid-bg: #3a2220; --chip: #26302b;
+  --melee: #f0c27a; --melee-bg: #3a2e1a; --pierce: #9cc6f0; --pierce-bg: #1c2c3c;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 16px; line-height: 1.45; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.wrap { max-width: 860px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
+header.top .wrap { padding-block: 14px 12px; display: grid; gap: 10px; }
+.titlerow { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+h1 { font-family: var(--display); font-weight: 700; font-size: 1.6rem; margin: 0; letter-spacing: .01em; text-wrap: balance; }
+.hint { color: var(--muted); font-size: .85rem; }
+kbd { font-family: var(--body); font-size: .8rem; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--panel); }
+.search { display: flex; gap: 8px; }
+#q { flex: 1; min-width: 0; font: inherit; font-size: 1.15rem; padding: 10px 14px; border: 2px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--fg); }
+#q:focus { outline: none; border-color: var(--accent); }
+#civ { font: inherit; font-size: .95rem; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); max-width: 13rem; min-width: 0; }
+#civ:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.civnote { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; font-size: .95rem; }
+.miss { color: var(--muted); font-size: .88rem; margin-top: 4px; }
+.cap { color: var(--avoid); font-size: .85rem; margin-top: -4px; }
+.sec { font-family: var(--display); font-weight: 500; font-size: 1.05rem; color: var(--muted); margin: 10px 0 0; letter-spacing: .03em; }
+.sec span { font-family: var(--body); font-size: .85rem; font-variant-numeric: tabular-nums; }
+.civnote strong { font-family: var(--display); font-size: 1.15rem; }
+@media (max-width: 560px) { .search { flex-wrap: wrap; } #q { flex-basis: 100%; } #civ { flex: 1; max-width: none; padding-block: 8px; } }
+#clear { font: inherit; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); cursor: pointer; }
+.filters { display: flex; flex-wrap: wrap; gap: 6px; }
+.filters button { font: inherit; font-size: .85rem; padding: 3px 11px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
+.filters button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+button:focus-visible, #q:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+main .wrap { padding-block: 16px 48px; display: grid; gap: 12px; }
+.count { color: var(--muted); font-size: .85rem; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 10px; }
+.card h2 { font-family: var(--display); font-weight: 700; font-size: 1.3rem; margin: 0; line-height: 1.15; }
+.head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.tag { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; }
+.src { color: var(--muted); font-size: .9rem; }
+.line { color: var(--muted); font-size: .88rem; margin-top: -6px; }
+.row { display: grid; grid-template-columns: 9.5rem 1fr; gap: 10px; align-items: start; }
+.row > * { min-width: 0; }
+.lbl { font-size: .75rem; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; padding-top: 5px; }
+.beat .lbl { color: var(--beat); }
+.avoid .lbl { color: var(--avoid); }
+.uniq .lbl { color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips span, .chips button { font: inherit; font-size: .92rem; padding: 3px 10px; border-radius: 6px; border: 0; }
+.beat .chips > * { background: var(--beat-bg); color: var(--beat); font-weight: 500; }
+.avoid .chips > * { background: var(--avoid-bg); color: var(--avoid); }
+.uniq .chips > * { background: var(--chip); color: var(--fg); font-size: .85rem; }
+.chips button { cursor: pointer; text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px; }
+.chips button:hover { text-decoration-color: currentColor; }
+.tip { font-size: .95rem; border-top: 1px dashed var(--line); padding-top: 8px; }
+.dmg { display: grid; gap: 6px; background: var(--bg); border-radius: 8px; padding: 10px 12px; font-size: .9rem; }
+.drow { display: grid; grid-template-columns: 9rem 1fr; gap: 10px; align-items: baseline; }
+.drow > *:not(.dl) { min-width: 0; }
+.drow:first-child { grid-template-columns: 9rem auto 1fr; }
+.dl { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 700; }
+.dtype { font-weight: 700; padding: 1px 9px; border-radius: 999px; justify-self: start; }
+.dtype.m { background: var(--melee-bg); color: var(--melee); }
+.dtype.p { background: var(--pierce-bg); color: var(--pierce); }
+.dtype.o { background: var(--chip); color: var(--fg); }
+.dnote { color: var(--muted); }
+.cls { display: flex; flex-wrap: wrap; gap: 5px; }
+.cls span { border: 1px solid var(--line); border-radius: 4px; padding: 0 7px; background: var(--panel); }
+.chips.plain > * { background: var(--chip); color: var(--fg); font-size: .85rem; padding: 1px 8px; }
+.legend { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 16px; font-size: .92rem; }
+.legend summary { cursor: pointer; font-weight: 700; }
+.legend ul { margin: 8px 0 2px; padding-left: 1.2rem; display: grid; gap: 4px; }
+@media (max-width: 560px) { .drow, .drow:first-child { grid-template-columns: 1fr; gap: 2px; } }
+.empty { color: var(--muted); padding: 24px 0; }
+footer { color: var(--muted); font-size: .8rem; }
+@media (max-width: 560px) {
+  .row { grid-template-columns: 1fr; gap: 4px; }
+  .lbl { padding-top: 0; }
+  .hint { display: none; }
+}
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="titlerow">
+      <h1>AoE2 Counter Lookup</h1>
+      <span class="hint"><kbd>/</kbd> search &nbsp; <kbd>Esc</kbd> clear &nbsp; click any green unit to jump to it</span>
+    </div>
+    <div class="search">
+      <input id="q" type="search" placeholder="Type a unit or civ: knight, mangudai, Britons…" autocomplete="off" spellcheck="false" aria-label="Search units or civilizations">
+      <select id="civ" aria-label="Filter by civilization"><option value="">All civilizations</option></select>
+      <button id="clear" type="button">Clear</button>
+    </div>
+    <div class="filters" id="filters" role="group" aria-label="Filter by unit type"></div>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+    <details class="legend" id="legend">
+      <summary>How damage works</summary>
+      <ul>
+        <li><b>Melee</b> damage is reduced by the target's <b>melee armor</b>. <b>Pierce</b> damage (arrows, bullets, bolts) is reduced by <b>pierce armor</b>.</li>
+        <li><b>Bonus damage</b> is extra damage against an <b>armor class</b>. Spearmen hit anything in the Cavalry class extra hard; skirmishers do the same to the Archer class.</li>
+        <li>A unit can be in several classes. A cavalry archer is in Archer and Cavalry archer, so skirmishers' bonus hits it.</li>
+        <li>Most counters come from this. Check "Takes bonus from" on any card to see which regular units are built to beat it.</li>
+      </ul>
+    </details>
+    <div class="count" id="count"></div>
+    <div id="list" style="display:grid;gap:12px"></div>
+    <footer>Civ rosters come from the aoe2techtree.net data file. Ship upgrades aren't tracked. General Definitive Edition matchups. Upgrades, civ bonuses and numbers still decide fights, and unique-unit details shift between patches.</footer>
+  </div>
+</main>
+
+<script>
+// [id, name, type, where, also-known-as, countered by, strong against, tip]
+// Entries in the counter lists that match a unit id become clickable links.
+const U = [
+// ---- Infantry
+["militia","Militia line","Infantry","Barracks","man-at-arms long swordsman two-handed swordsman champion swordsman",
+ ["archer","handcannon","cataphract","teutonic","jaguar","mangonel"],
+ ["eagle","spear","skirm","huskarl","Buildings","Trash units"],
+ "Strong in melee against other infantry. Costs gold, so don't feed it into massed archers without cavalry or siege support."],
+["spear","Spearman line","Infantry","Barracks","pikeman halberdier pike halb spear",
+ ["archer","militia","handcannon","scorpion","mangonel"],
+ ["knight","camel","elephant","lancer","scout","Most cavalry uniques"],
+ "Your cheap, no-gold answer to any horse or elephant. Keep them in front of your archers to soak cavalry charges."],
+["eagle","Eagle Warrior line","Infantry","Barracks (Aztecs, Mayans, Incas)","eagle scout elite eagle",
+ ["militia","jaguar","knight","handcannon","cataphract"],
+ ["archer","skirm","monk","mangonel","scorpion","ram","treb","ca"],
+ "Fast with high pierce armor. Runs down archers, monks and siege. Lose them in straight melee against champions."],
+["skirm","Skirmisher line","Archer","Archery Range","skirmisher elite skirmisher imperial skirmisher skirm",
+ ["militia","scout","knight","handcannon","mangonel","woad"],
+ ["archer","ca","longbow","chukonu","plumed","mangudai","Spearman (slightly)"],
+ "Trash (no gold) anti-archer unit. Almost useless against anything that isn't an archer, so pair it with pikes or light cav."],
+["archer","Archer line","Archer","Archery Range","archer crossbowman crossbow arbalester arbalest arb xbow",
+ ["skirm","mangonel","knight","scout","eagle","huskarl","woad"],
+ ["spear","militia","Slow infantry","camel","Villagers"],
+ "Deadly in large numbers behind a melee screen. Spread them out against onagers and keep them away from cavalry."],
+["ca","Cavalry Archer line","Archer","Archery Range","cavalry archer heavy cavalry archer ca hca horse archer",
+ ["skirm","scout","camelarcher","eagle","huskarl"],
+ ["spear","militia","Slow units","archer","Villagers"],
+ "Expensive but mobile; it kites slow units forever. Elite skirmishers plus fast hussars are the cleanest answer."],
+["handcannon","Hand Cannoneer","Gunpowder","Archery Range","hand cannoneer hc gunpowder",
+ ["skirm","mangonel","knight","scout","archer"],
+ ["militia","spear","eagle","Infantry uniques"],
+ "Huge damage to infantry but inaccurate at range and slow to fire. Outranged by archers, and cavalry closes the gap easily."],
+// ---- Cavalry
+["scout","Scout Cavalry line","Cavalry","Stable","scout light cavalry light cav hussar winged hussar lc",
+ ["spear","camel","knight","militia","kamayuk"],
+ ["monk","skirm","mangonel","scorpion","treb","bombard","Villagers","ca"],
+ "Cheap (no gold) raider and siege cleaner. Light cav/hussars are the best monk killers in the game."],
+["knight","Knight line","Cavalry","Stable","knight cavalier paladin pally kt",
+ ["spear","camel","monk","mameluke","kamayuk","genoese"],
+ ["archer","skirm","handcannon","mangonel","scorpion","bombard","ca","Villagers"],
+ "Durable all-rounder. Halberdiers and camels shred it per resource spent, and monks love converting it."],
+["camel","Camel Rider line","Cavalry","Stable (mostly desert & Asian civs)","camel rider heavy camel imperial camel",
+ ["spear","militia","archer","monk"],
+ ["knight","scout","lancer","cataphract","elephant","boyar"],
+ "Built to kill cavalry. Weak to everything on foot, so swap to archers or infantry once their horses are gone."],
+["elephant","Battle Elephant","Cavalry","Stable (SE Asian & Indian civs)","battle elephant elite battle elephant elephant",
+ ["spear","monk","militia","kamayuk"],
+ ["Buildings","archer","skirm","knight","Melee units"],
+ "Slow, tanky and splashes damage. Halberdiers plus a few monks are the textbook answer."],
+["lancer","Steppe Lancer","Cavalry","Stable (Steppe civs)","steppe lancer elite steppe lancer lancer",
+ ["spear","camel","knight","monk"],
+ ["archer","skirm","Siege","Villagers"],
+ "Attacks from 1 range so they stack up well in groups. Weaker than knights head to head."],
+// ---- Siege
+["ram","Battering Ram line","Siege","Siege Workshop","battering ram capped ram siege ram ram",
+ ["militia","scout","knight","eagle","camel","Any melee unit"],
+ ["Buildings","Castles","archer"],
+ "Nearly immune to arrows. Ignore it with archers; kill it with any melee unit or a few villagers."],
+["mangonel","Mangonel line","Siege","Siege Workshop","mangonel onager siege onager mango",
+ ["scout","knight","bombard","eagle","Another onager (micro)"],
+ ["archer","skirm","spear","handcannon","Clumped infantry"],
+ "Area damage punishes balled-up armies. Fast cavalry diving in is the standard answer."],
+["scorpion","Scorpion","Siege","Siege Workshop","scorpion heavy scorpion",
+ ["knight","scout","mangonel","bombard","eagle"],
+ ["archer","spear","militia","Lines of infantry"],
+ "Bolts pass through rows of units. Weak in melee, so guard it."],
+["bombard","Bombard Cannon","Siege","Siege Workshop (Imperial Age)","bombard cannon bbc cannon",
+ ["scout","knight","eagle","treb"],
+ ["Buildings","Towers","mangonel","scorpion","treb","ballistaelephant"],
+ "Long range, kills siege and buildings. Vulnerable to any fast unit that reaches it."],
+["treb","Trebuchet","Siege","Castle","trebuchet treb",
+ ["scout","knight","bombard","eagle","Enemy trebuchets"],
+ ["Castles","Towers","Buildings"],
+ "Out-ranges every building. Packs and unpacks slowly, so raid it while it moves."],
+// ---- Monk
+["monk","Monk","Monk","Monastery","monk priest",
+ ["scout","eagle","archer","skirm"],
+ ["elephant","knight","camel","cataphract","warelephant","elephantarcher","Slow gold units"],
+ "Converts single expensive units. Light cav/hussars have bonus armor against conversion attempts and run monks down."],
+// ---- Ships
+["galley","Galley line","Ship","Dock","galley war galley galleon",
+ ["fire","demo","Bombard towers"],
+ ["demo","cannongalleon","Fishing ships","Transport ships"],
+ "Backbone of water fights. Kite away from fire ships; spread out against demolition ships."],
+["fire","Fire Ship line","Ship","Dock","fire galley fire ship fast fire ship",
+ ["demo","Galleys that kite","Towers & castles"],
+ ["galley","cannongalleon"],
+ "Short range, eats galleys at close quarters. Doesn't do well against buildings."],
+["demo","Demolition Ship line","Ship","Dock","demolition raft demolition ship heavy demolition ship demo",
+ ["galley","Towers"],
+ ["fire","Clumped galleys","Docks"],
+ "One-shot suicide boat. Shoot it before it arrives."],
+["cannongalleon","Cannon Galleon","Ship","Dock (Imperial Age)","cannon galleon elite cannon galleon",
+ ["galley","fire","demo"],
+ ["Buildings","Units near the shore"],
+ "Long range against land targets. Always escort with galleons."],
+// ---- Unique units
+["longbow","Longbowman","Unique","Castle · Britons","longbowman longbow",
+ ["skirm","mangonel","knight","scout","eagle","huskarl"],
+ ["spear","militia","Slow infantry"],
+ "Huge range archer. Treat it like an archer that outranges your skirmishers, so close in with cavalry or onagers."],
+["mangudai","Mangudai","Unique","Castle · Mongols","mangudai",
+ ["skirm","scout","camelarcher","huskarl"],
+ ["Siege (bonus)","spear","archer","militia"],
+ "Very fast cavalry archer with a siege bonus. Elite skirms plus hussars to chase."],
+["cataphract","Cataphract","Unique","Castle · Byzantines","cataphract cata",
+ ["archer","monk","camel","mameluke"],
+ ["spear","militia","eagle","Infantry"],
+ "Cavalry that destroys infantry, even halberdiers. Shoot it or convert it instead."],
+["teutonic","Teutonic Knight","Unique","Castle · Teutons","teutonic knight tk",
+ ["archer","ca","handcannon","mangonel"],
+ ["militia","spear","eagle","Buildings"],
+ "Huge melee armor but very slow. Kite it with ranged units and never fight it in melee."],
+["huskarl","Huskarl","Unique","Castle & Barracks · Goths","huskarl",
+ ["militia","knight","cataphract","handcannon"],
+ ["archer","skirm","Buildings"],
+ "Infantry with enormous pierce armor. Archers are useless against it; use champions or knights."],
+["woad","Woad Raider","Unique","Castle · Celts","woad raider woad",
+ ["archer","militia","knight","handcannon","scorpion"],
+ ["skirm","Siege","spear","Villagers"],
+ "Very fast infantry. Arrows and champions handle it."],
+["throwingaxe","Throwing Axeman","Unique","Castle · Franks","throwing axeman axeman",
+ ["knight","scout","archer","handcannon","mangonel"],
+ ["militia","spear","eagle"],
+ "Short-range infantry. It is still infantry, so archers out-range it."],
+["samurai","Samurai","Unique","Castle · Japanese","samurai",
+ ["archer","handcannon","knight","cataphract"],
+ ["Unique units (bonus)","militia","spear","eagle"],
+ "Fast-attacking infantry with a bonus vs unique units. Answer it with generic archers and cavalry."],
+["janissary","Janissary","Unique","Castle · Turks","janissary jan",
+ ["skirm","knight","scout","mangonel"],
+ ["militia","spear","eagle","Infantry"],
+ "Long-range hand cannoneer. Cavalry and onagers handle it."],
+["warelephant","War Elephant","Unique","Castle · Persians","war elephant",
+ ["spear","monk","militia"],
+ ["Buildings","knight","archer","skirm"],
+ "Enormously tanky and very slow. Mass halberdiers and monks."],
+["elephantarcher","Elephant Archer","Unique","Archery Range · Indian civs","elephant archer",
+ ["spear","monk","militia"],
+ ["archer","skirm","Infantry"],
+ "High HP mobile archer. Halberdiers and monks are the usual answer."],
+["mameluke","Mameluke","Unique","Castle · Saracens","mameluke mamluk",
+ ["spear","militia","archer","handcannon"],
+ ["knight","scout","lancer","cataphract"],
+ "Camel that throws swords at range. Anti-cavalry, so beat it with infantry and archers."],
+["chukonu","Chu Ko Nu","Unique","Castle · Chinese","chu ko nu chukonu",
+ ["skirm","mangonel","knight","scout","eagle","huskarl"],
+ ["militia","spear","Infantry"],
+ "Fires several arrows per shot. Skirmishers and onagers counter it hard."],
+["conquistador","Conquistador","Unique","Castle · Spanish","conquistador conq",
+ ["skirm","spear","camel","eagle"],
+ ["militia","monk","Infantry"],
+ "Mounted hand cannoneer. Counts as cavalry for spears and camels, and as an archer for skirmishers."],
+["jaguar","Jaguar Warrior","Unique","Castle · Aztecs","jaguar warrior jag",
+ ["archer","handcannon","knight","cataphract"],
+ ["militia","eagle","huskarl","Infantry"],
+ "Infantry killer. Don't fight it with your own infantry."],
+["plumed","Plumed Archer","Unique","Castle · Mayans","plumed archer",
+ ["skirm","mangonel","knight","eagle","huskarl"],
+ ["spear","militia","archer"],
+ "Fast, tanky archer. Elite skirms and onagers."],
+["tarkan","Tarkan","Unique","Castle · Huns","tarkan",
+ ["spear","camel","monk","archer"],
+ ["Buildings","Siege","archer","skirm"],
+ "Building raider. Halberdiers and camels at home."],
+["warwagon","War Wagon","Unique","Castle · Koreans","war wagon",
+ ["militia","spear","monk","bombard"],
+ ["archer","skirm","Infantry at range"],
+ "Very high pierce armor. Melee infantry and cannons."],
+["genoese","Genoese Crossbowman","Unique","Castle · Italians","genoese crossbowman genoese",
+ ["skirm","mangonel","eagle","huskarl"],
+ ["knight","camel","scout","elephant","lancer"],
+ "Anti-cavalry archer. Swap off cavalry and use skirmishers or eagles."],
+["berserk","Berserk","Unique","Castle · Vikings","berserk berserker",
+ ["archer","handcannon","knight","cataphract"],
+ ["militia","spear","eagle"],
+ "Self-healing infantry. Out-range it."],
+["kamayuk","Kamayuk","Unique","Castle · Incas","kamayuk",
+ ["archer","militia","handcannon","scorpion"],
+ ["knight","camel","elephant","scout","lancer"],
+ "Spear with 1 range. Pure anti-cavalry, so use archers."],
+["slinger","Slinger","Unique","Archery Range · Incas","slinger",
+ ["knight","scout","skirm","mangonel"],
+ ["militia","spear","eagle","Rams"],
+ "Ranged unit with a bonus vs infantry. Hit it with cavalry."],
+["boyar","Boyar","Unique","Castle · Slavs","boyar",
+ ["spear","camel","monk","mameluke"],
+ ["militia","Siege","archer"],
+ "Heavy melee armor cavalry. Pikes, camels and monks."],
+["leitis","Leitis","Unique","Castle · Lithuanians","leitis",
+ ["spear","camel","monk","archer"],
+ ["knight","cataphract","teutonic","boyar"],
+ "Ignores armor, so heavy units melt. Use cheap units and archers."],
+["keshik","Keshik","Unique","Castle · Tatars","keshik",
+ ["spear","camel","monk"],
+ ["archer","skirm","Siege","Villagers"],
+ "Light cav that makes gold as it fights. Pikes and camels."],
+["organgun","Organ Gun","Unique","Castle · Portuguese","organ gun",
+ ["knight","scout","bombard","mangonel","eagle"],
+ ["militia","spear","archer","Infantry"],
+ "Gunpowder siege that sprays bullets. Dive it with cavalry."],
+["arambai","Arambai","Unique","Castle · Burmese","arambai",
+ ["skirm","spear","camel","monk"],
+ ["militia","knight","Siege"],
+ "Mounted dart thrower with huge damage but poor accuracy. Skirms and pikes are cheap answers."],
+["rattan","Rattan Archer","Unique","Castle · Vietnamese","rattan archer",
+ ["militia","knight","handcannon","mangonel"],
+ ["archer","skirm","ca","spear"],
+ "Archer with very high pierce armor. Your arrows won't work; use melee or gunpowder."],
+["karambit","Karambit Warrior","Unique","Castle · Malay","karambit warrior",
+ ["archer","mangonel","militia","scorpion"],
+ ["spear","skirm","Siege"],
+ "Cheap, half-population infantry swarm. Splash damage and archers."],
+["ballistaelephant","Ballista Elephant","Unique","Castle · Khmer","ballista elephant",
+ ["spear","monk","bombard","militia"],
+ ["archer","skirm","Clumped infantry"],
+ "Ranged elephant whose bolts pass through units. Halberdiers and monks."],
+["camelarcher","Camel Archer","Unique","Castle · Berbers","camel archer",
+ ["skirm","scout","eagle","huskarl"],
+ ["ca","mangudai","elephantarcher"],
+ "Built to beat cavalry archers. Elite skirms handle it."],
+["gbeto","Gbeto","Unique","Castle · Malians","gbeto",
+ ["archer","knight","handcannon","scorpion"],
+ ["spear","militia","skirm","Siege"],
+ "Fast ranged infantry, very fragile. Arrows and cavalry."],
+["shotel","Shotel Warrior","Unique","Castle · Ethiopians","shotel warrior",
+ ["archer","knight","handcannon","scorpion"],
+ ["spear","skirm","Siege","Villagers"],
+ "Fast glass-cannon infantry. Shoot it."],
+["magyarhuszar","Magyar Huszar","Unique","Castle · Magyars","magyar huszar",
+ ["spear","camel","knight"],
+ ["Siege (bonus)","archer","skirm","monk"],
+ "Cheap light cavalry with a siege bonus. Pikes and camels."],
+["konnik","Konnik","Unique","Castle & Krepost · Bulgarians","konnik",
+ ["spear","camel","monk","archer"],
+ ["archer","militia","Siege"],
+ "Turns into infantry when it dies. Plan a follow-up with archers for the dismounted version."],
+["coustillier","Coustillier","Unique","Castle · Burgundians","coustillier",
+ ["spear","camel","monk"],
+ ["archer","skirm","Siege"],
+ "Cavalry with a huge charge attack. Pikes absorb it."],
+["serjeant","Serjeant","Unique","Castle & Donjon · Sicilians","serjeant",
+ ["militia","knight","handcannon"],
+ ["archer","spear","eagle"],
+ "Infantry with high pierce armor. Melee units and gunpowder."],
+["obuch","Obuch","Unique","Castle · Poles","obuch",
+ ["archer","handcannon","scorpion"],
+ ["knight","militia","boyar","Armored units"],
+ "Strips armor off its target. Out-range it."],
+["hussitewagon","Hussite Wagon","Unique","Castle · Bohemians","hussite wagon",
+ ["militia","bombard","knight","mangonel"],
+ ["archer","handcannon","skirm"],
+ "Gunpowder wagon that shields nearby units from arrows. Melee and cannons."],
+["ghulam","Ghulam","Unique","Castle · Hindustanis","ghulam",
+ ["militia","knight","archer"],
+ ["spear","skirm","archer","Siege"],
+ "Infantry whose attacks pass through to units behind. Champions and knights."],
+["shrivamsha","Shrivamsha Rider","Unique","Castle · Gurjaras","shrivamsha rider",
+ ["spear","camel","militia"],
+ ["archer","skirm","ca"],
+ "Light cavalry that dodges arrows. Use melee answers."],
+["urumi","Urumi Swordsman","Unique","Castle · Dravidians","urumi swordsman",
+ ["archer","handcannon","knight","cataphract"],
+ ["militia","spear","skirm","Siege"],
+ "Infantry with a charge attack that hits several units. Keep it at range."],
+["ratha","Ratha","Unique","Castle · Bengalis","ratha chariot",
+ ["spear","monk","militia"],
+ ["archer","skirm"],
+ "Elephant chariot that switches between melee and ranged. Halberdiers and monks."],
+["kipchak","Kipchak","Unique","Castle · Cumans","kipchak",
+ ["skirm","scout","camelarcher","huskarl"],
+ ["spear","militia","archer"],
+ "Cavalry archer that fires several arrows. Elite skirms and hussars."],
+["centurion","Centurion","Unique","Castle · Romans","centurion",
+ ["spear","camel","monk"],
+ ["archer","skirm","Siege"],
+ "Cavalry that boosts nearby Roman infantry. Kill it first with pikes or camels."],
+["composite","Composite Bowman","Unique","Castle · Armenians","composite bowman",
+ ["skirm","mangonel","knight","eagle"],
+ ["spear","militia","archer"],
+ "Archer that ignores part of its target's armor. Answer it like any archer."],
+["monaspa","Monaspa","Unique","Castle · Georgians","monaspa",
+ ["spear","camel","monk"],
+ ["archer","militia","Siege"],
+ "Cavalry that gets stronger in groups. Pikes and camels."]
+];
+
+const byId = Object.fromEntries(U.map(u => [u.id = u[0], u]));
+const TYPES = ["All","Infantry","Archer","Gunpowder","Cavalry","Siege","Monk","Ship","Unique"];
+let filter = "All", civ = "";
+// Unique units: civ comes from the text after "·" in the source field.
+U.forEach(u => { const m = u[3].split("·")[1]; u.civs = u[2] === "Unique" && m ? [m.trim()] : []; });
+byId.elephantarcher.civs = ["Bengalis", "Dravidians", "Gurjaras", "Hindustanis"];
+
+// Regular-unit rosters from aoe2techtree.net data. Left of "|": lines the civ can't build at all.
+// Right of "|": lines it has but without the final upgrade.
+const CODE = { E:"eagle", H:"handcannon", S:"scout", K:"knight", C:"camel", B:"elephant", L:"lancer", A:"ca", Bc:"bombard",
+  G:"cannongalleon", Ea:"elephantarcher", R:"ram", M:"mangonel", Mi:"militia", D:"demo", Sp:"spear", Ar:"archer", Sk:"skirm", Sc:"scorpion" };
+const TOP = { militia:"Champion", spear:"Halberdier", archer:"Arbalester", skirm:"Elite Skirmisher", ca:"Heavy Cavalry Archer",
+  scout:"Hussar", knight:"Paladin", camel:"Heavy Camel Rider", elephant:"Elite Battle Elephant", lancer:"Elite Steppe Lancer",
+  eagle:"Elite Eagle Warrior", ram:"Siege Ram", mangonel:"Siege Onager", scorpion:"Heavy Scorpion", cannongalleon:"Elite Cannon Galleon" };
+const ROSTER_RAW = {
+  Armenians:"E H C B L Bc Ea|A S K C B L E M G", Aztecs:"H S K C B L A Bc G Ea|Sp A S K C B L Sc G",
+  Bengalis:"E H K C L A Bc R|A S K C L E R M", Berbers:"E B L Ea|Sp K B L E R M",
+  Bohemians:"E C B L A Ea|A S K C B L E R M Sc", Britons:"E H C B L A Bc Ea|A S K C B L E R M Sc G",
+  Bulgarians:"E H C B L Bc Ea|Mi Ar K C B L E Sc G", Burgundians:"E C B L A Ea|Ar A C B L E R M Sc",
+  Burmese:"E H C L Ea|Ar K C L E R M", Byzantines:"E B L G Ea|B L E M Sc G",
+  Celts:"E H C B L A Bc Ea|Ar A C B L E Sc G", Chinese:"E H C B L Bc G Ea|A S K C B L E M Sc G",
+  Cumans:"E H B Bc G Ea|Ar C B E Sc G", Dravidians:"E K C L A R|A S K C B L E R Sc",
+  Ethiopians:"E H B L Ea|Mi K B L E G", Franks:"E C B L A Ea|Ar A S C B L E R M Sc G",
+  Georgians:"E C B L Bc Ea|Ar K C B L E G", Goths:"E C B L G Ea|Ar K C B L E R M G",
+  Gurjaras:"E K B L A R|Mi Sp Ar A K B L E R M G", Hindustanis:"E K B L R|Sp Ar K B L E R M Sc",
+  Huns:"E H C B L Bc G Ea|Mi Ar C B L E R M Sc G", Incas:"H S K C B L A Bc G Ea Mi|S A K C B L M",
+  Italians:"E C B L A Ea|Sp A K C B L E R M Sc", Japanese:"E C B L Bc Ea|S K C B L E R M",
+  Khmer:"E C L Bc Ea|Mi K C L E M", Koreans:"E C B L Ea M D|K C B L E R M Sc",
+  Lithuanians:"E C B L Ea|Ar S C B L E R M Sc", Magyars:"E H C B L Bc Ea|C B L E R M G",
+  Malay:"E H C L Ea|A S K C L E M", Malians:"E B L Ea|Sp S K B L E R Sc G",
+  Mayans:"H S K C B L A Bc G Ea|S A K C B L M G", Mongols:"E H B Bc Ea|Sp K B E G",
+  Persians:"E B L Ea|Mi Ar K B L E M", Poles:"E H C B L A Ea|Sp A S K C B L E M Sc G",
+  Portuguese:"E C B L A Ea|A S K C B L E R M Sc", Romans:"E H C B L Bc G Ea|Mi S K C B L E M G",
+  Saracens:"E B L Ea|K B L E Sc", Sicilians:"E H C B L A Bc Ea|A S K C B L E G",
+  Slavs:"E H C B L A Bc Ea|Sp Ar K C B L E G", Spanish:"E C B L A Ea|Ar A C B L E M Sc",
+  Tatars:"E B Bc Ea|Mi Ar K B E M", Teutons:"E C B L A Ea|Ar A S C B L E R G",
+  Turks:"E B L Ea|Sp Ar Sk K B L E M", Vietnamese:"E H C L Ea|S K C L E M Sc",
+  Vikings:"E H C B L A Bc G Ea D|Sp A S K C B L E M G"
+};
+// Upgrades a civ gets in place of the normal final one.
+const SWAP = { "Romans:militia":"Legionary instead of Champion", "Poles:scout":"Winged Hussar instead of Hussar",
+  "Vietnamese:skirm":"Also gets Imperial Skirmisher" };
+const ROSTER = {};
+for (const [c, s] of Object.entries(ROSTER_RAW)) {
+  const [no, top] = s.split("|").map(p => p.split(" ").filter(Boolean).map(k => CODE[k]));
+  ROSTER[c] = { no: new Set(no), top: new Set(top) };
+}
+const GENERIC = U.filter(u => u[2] !== "Unique");
+const CIVS = Object.keys(ROSTER).sort();
+const civEl = document.getElementById("civ");
+civEl.insertAdjacentHTML("beforeend", CIVS.map(c => `<option value="${c}">${c}</option>`).join(""));
+civEl.addEventListener("change", () => { civ = civEl.value; render(); });
+
+// Damage facts: [damage type, bonus damage vs these armor classes, armor classes the unit has, armor note]
+const DMG = {
+  militia:["Melee","Eagle, Building","Infantry","Balanced; melee armor grows with upgrades"],
+  spear:["Melee","Cavalry, Camel, Elephant","Infantry, Spearman","Low armor and HP, but cheap"],
+  eagle:["Melee","Monk, Cavalry, Camel","Infantry, Eagle","High pierce armor"],
+  skirm:["Pierce","Archer, Spearman","Archer","High pierce armor, almost no melee armor"],
+  archer:["Pierce","Spearman","Archer","Low HP and melee armor"],
+  ca:["Pierce","Spearman","Archer, Cavalry archer","Moderate armor, high speed"],
+  handcannon:["Pierce","Infantry, Ram","Archer, Gunpowder","Low pierce armor for its cost"],
+  scout:["Melee","Monk","Cavalry","Good pierce armor for its cost"],
+  knight:["Melee","","Cavalry","High melee and pierce armor"],
+  camel:["Melee","Cavalry","Cavalry, Camel","Low melee armor"],
+  elephant:["Melee (splash)","Building","Cavalry, Elephant","Huge HP; easy to convert"],
+  lancer:["Melee (range 1)","","Cavalry","Low armor"],
+  ram:["Melee","Building, Siege","Siege, Ram","Very high pierce armor, weak to melee"],
+  mangonel:["Melee (area)","Building, Siege, Ship","Siege","Fragile up close; hits your own units too"],
+  scorpion:["Pierce (pass-through)","Elephant","Siege","Good pierce armor, weak to melee"],
+  bombard:["Siege shot","Building, Siege, Ship","Siege, Gunpowder","Slow, can't hit units next to it"],
+  treb:["Siege shot","Building","Siege","Must unpack to fire; very long range"],
+  monk:["Conversion (no damage)","","Monk","Low HP; heals allies"],
+  galley:["Pierce","Ship","Ship",""],
+  fire:["Fire (short range)","Ship","Ship","High pierce armor"],
+  demo:["Melee (explodes)","Ship, Building","Ship","Destroyed when it attacks"],
+  cannongalleon:["Siege shot","Building","Ship, Gunpowder","Can't hit nearby targets; weak vs ships"],
+  longbow:["Pierce","Spearman","Archer","Low HP, very long range"],
+  mangudai:["Pierce","Siege","Archer, Cavalry archer","Fast, fires quickly"],
+  cataphract:["Melee (trample)","Infantry","Cavalry","High armor; resists anti-cavalry bonus"],
+  teutonic:["Melee","","Infantry","Very high melee armor, very slow"],
+  huskarl:["Melee","Archer, Building","Infantry","Very high pierce armor"],
+  woad:["Melee","Building","Infantry","Fast, low armor"],
+  throwingaxe:["Melee (thrown, range 3)","","Infantry","Low armor"],
+  samurai:["Melee","Unique unit","Infantry","Attacks fast"],
+  janissary:["Pierce","","Archer, Gunpowder","Long range, low pierce armor"],
+  warelephant:["Melee (splash)","Building","Cavalry, Elephant","Huge HP, very slow"],
+  elephantarcher:["Pierce","","Archer, Cavalry archer, Elephant","High HP, weak to conversion"],
+  mameluke:["Melee (thrown, range 3)","Cavalry","Cavalry, Camel","Medium armor"],
+  chukonu:["Pierce (several arrows)","","Archer","Low armor"],
+  conquistador:["Pierce","Infantry","Cavalry, Archer, Gunpowder","Low pierce armor"],
+  jaguar:["Melee","Infantry","Infantry","Medium armor"],
+  plumed:["Pierce","","Archer","Good pierce armor for an archer"],
+  tarkan:["Melee","Building","Cavalry","Medium armor"],
+  warwagon:["Pierce","","Cavalry archer","Very high pierce armor"],
+  genoese:["Pierce","Cavalry, Camel, Elephant","Archer","Low armor"],
+  berserk:["Melee","","Infantry","Heals itself over time"],
+  kamayuk:["Melee (range 1)","Cavalry, Camel, Elephant","Infantry, Spearman","Medium armor"],
+  slinger:["Pierce","Infantry, Ram","Archer","Low armor"],
+  boyar:["Melee","","Cavalry","Very high melee armor"],
+  leitis:["Melee (ignores armor)","","Cavalry","Medium armor"],
+  keshik:["Melee","","Cavalry","Low armor"],
+  organgun:["Pierce (several bullets)","","Siege, Gunpowder","Fragile up close"],
+  arambai:["Pierce (inaccurate)","","Archer, Cavalry archer","Low armor"],
+  rattan:["Pierce","","Archer","Very high pierce armor"],
+  karambit:["Melee","","Infantry","Very low HP; half population"],
+  ballistaelephant:["Pierce (pass-through)","","Cavalry, Elephant","High HP"],
+  camelarcher:["Pierce","Cavalry archer","Archer, Cavalry archer, Camel","Good pierce armor"],
+  gbeto:["Melee (thrown, range 5)","","Infantry","Very low HP"],
+  shotel:["Melee","","Infantry","Very low armor, fast"],
+  magyarhuszar:["Melee","Siege","Cavalry","Low armor"],
+  konnik:["Melee","","Cavalry","Becomes infantry on death"],
+  coustillier:["Melee (charge)","","Cavalry","Medium armor"],
+  serjeant:["Melee","","Infantry","Good armor"],
+  obuch:["Melee (strips armor)","","Infantry","Medium armor"],
+  hussitewagon:["Pierce","","Siege, Gunpowder","Shields nearby units from arrows"],
+  ghulam:["Melee (pass-through)","","Infantry","Good pierce armor"],
+  shrivamsha:["Melee","","Cavalry","Dodges ranged attacks"],
+  urumi:["Melee (charge)","","Infantry","Low armor"],
+  ratha:["Melee or Pierce (switches)","","Cavalry, Elephant","High HP"],
+  kipchak:["Pierce (several arrows)","","Archer, Cavalry archer","Low armor"],
+  centurion:["Melee","","Cavalry","High armor"],
+  composite:["Pierce (ignores some armor)","","Archer","Low armor"],
+  monaspa:["Melee","","Cavalry","Medium armor"]
+};
+const split = s => s ? s.split(", ") : [];
+// Regular units that deal bonus damage to one of this unit's armor classes.
+function takesBonusFrom(id) {
+  const mine = split(DMG[id]?.[2]);
+  return GENERIC.filter(u => u.id !== id && split(DMG[u.id]?.[1]).some(c => mine.includes(c))).map(u => u.id);
+}
+function dmgBlock(id) {
+  const d = DMG[id]; if (!d) return "";
+  const [type, bonus, cls, note] = d;
+  const kind = /^Pierce/.test(type) ? "p" : /^Melee/.test(type) ? "m" : "o";
+  const from = takesBonusFrom(id);
+  const pills = arr => arr.map(c => `<span>${esc(c)}</span>`).join("");
+  return `<div class="dmg">
+    <div class="drow"><span class="dl">Deals</span><span class="dtype ${kind}">${esc(type)}</span>${note ? `<span class="dnote">${esc(note)}</span>` : ""}</div>
+    ${bonus ? `<div class="drow"><span class="dl">Bonus vs</span><span class="cls">${pills(split(bonus))}</span></div>` : ""}
+    <div class="drow"><span class="dl">Armor class</span><span class="cls">${pills(split(cls))}</span></div>
+    ${from.length ? `<div class="drow"><span class="dl">Takes bonus from</span><span class="chips plain">${chips(from)}</span></div>` : ""}
+  </div>`;
+}
+
+// Reverse lookup: unique units whose "strong against" list names this unit.
+function uniqueAnswers(id) {
+  return U.filter(u => u[2] === "Unique" && u[6].includes(id) && !byId[id][5].includes(u.id)).map(u => u.id);
+}
+
+const q = document.getElementById("q"), list = document.getElementById("list"), count = document.getElementById("count");
+const esc = s => s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function chips(arr) {
+  return arr.map(x => byId[x]
+    ? `<button type="button" data-go="${x}">${esc(byId[x][1])}</button>`
+    : `<span>${esc(x)}</span>`).join("");
+}
+
+function card(u) {
+  const [id, name, type, where, aka, counters, strong, tip] = u;
+  const extra = uniqueAnswers(id);
+  const r = civ && ROSTER[civ];
+  const cap = r ? (SWAP[civ + ":" + id] || (r.top.has(id) && TOP[id] ? `No ${TOP[id]} for ${civ}` : "")) : "";
+  return `<article class="card" id="u-${id}">
+    <div class="head"><h2>${esc(name)}</h2><span class="tag">${type}</span><span class="src">${esc(where)}</span></div>
+    ${cap ? `<div class="cap">${esc(cap)}</div>` : ""}
+    <div class="row beat"><div class="lbl">Beat it with</div><div class="chips">${chips(counters)}</div></div>
+    ${extra.length ? `<div class="row uniq"><div class="lbl">Unique units too</div><div class="chips">${chips(extra)}</div></div>` : ""}
+    <div class="row avoid"><div class="lbl">Don't send</div><div class="chips">${chips(strong)}</div></div>
+    ${dmgBlock(id)}
+    <div class="tip">${esc(tip)}</div>
+  </article>`;
+}
+
+function score(u, t) {
+  const name = u[1].toLowerCase(), aka = u[4];
+  if (name.startsWith(t)) return 3;
+  if ((" " + aka + " ").includes(" " + t)) return 2;
+  if (name.includes(t) || aka.includes(t)) return 1;
+  if (u.civs.some(c => c.toLowerCase().startsWith(t))) return 1;
+  return 0;
+}
+
+function narrow(rows, t) {
+  rows = rows.filter(u => filter === "All" || u[2] === filter);
+  return t ? rows.map(u => [score(u, t), u]).filter(r => r[0]).sort((a, b) => b[0] - a[0]).map(r => r[1]) : rows;
+}
+const emptyMsg = () => `<div class="empty">No unit matches “${esc(q.value)}”. Try a shorter name, like “cav” or “elephant”.</div>`;
+
+function render() {
+  const t = q.value.trim().toLowerCase();
+  const tail = (civ ? ` · ${civ}` : "") + (filter !== "All" ? ` · ${filter}` : "");
+  if (!civ) {
+    const rows = narrow(U, t);
+    list.innerHTML = rows.length ? rows.map(card).join("") : emptyMsg();
+    count.textContent = `${rows.length} unit${rows.length === 1 ? "" : "s"}` + tail;
+    return;
+  }
+  const r = ROSTER[civ];
+  const gens = narrow(GENERIC.filter(u => !r.no.has(u.id)), t);
+  const uniq = narrow(U.filter(u => u[2] === "Unique" && u.civs.includes(civ)), t);
+  const missing = GENERIC.filter(u => r.no.has(u.id)).map(u => u[1]);
+  const note = `<div class="civnote"><strong>${esc(civ)}</strong> · everything this civ can field, with counters for each.
+    ${missing.length ? `<div class="miss">Can't build: ${esc(missing.join(", "))}</div>` : ""}</div>`;
+  const sec = (label, rows) => rows.length ? `<h3 class="sec">${label} <span>${rows.length}</span></h3>` + rows.map(card).join("") : "";
+  const body = sec("Unique units", uniq) + sec("Regular units", gens);
+  list.innerHTML = note + (body || emptyMsg());
+  count.textContent = `${gens.length + uniq.length} unit${gens.length + uniq.length === 1 ? "" : "s"}` + tail;
+}
+
+const fEl = document.getElementById("filters");
+fEl.innerHTML = TYPES.map(t => `<button type="button" aria-pressed="${t === filter}" data-f="${t}">${t}</button>`).join("");
+fEl.addEventListener("click", e => {
+  const b = e.target.closest("[data-f]"); if (!b) return;
+  filter = b.dataset.f;
+  fEl.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x.dataset.f === filter));
+  render();
+});
+
+list.addEventListener("click", e => {
+  const b = e.target.closest("[data-go]"); if (!b) return;
+  const u = byId[b.dataset.go];
+  filter = "All"; civ = ""; civEl.value = "";
+  fEl.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x.dataset.f === "All"));
+  q.value = u[1].replace(/ line$/, "");
+  render();
+  window.scrollTo({ top: 0 });
+});
+
+q.addEventListener("input", render);
+document.getElementById("clear").addEventListener("click", () => { q.value = ""; civ = ""; civEl.value = ""; render(); q.focus(); });
+document.addEventListener("keydown", e => {
+  if (e.key === "/" && document.activeElement !== q) { e.preventDefault(); q.focus(); q.select(); }
+  else if (e.key === "Escape") { q.value = ""; render(); q.focus(); }
+});
+render();
+</script>
+
+</html>
